@@ -6,25 +6,31 @@
                     {
                         "key": "service.name",
                         "value": {
-                            "stringValue": "feature-builder-retail"
+                            "stringValue": "fdp-batch-generic"
+                        }
+                    },
+                    {
+                        "key": "source.name",
+                        "value": {
+                            "stringValue": "gitlab-pipeline"
                         }
                     },
                     {
                         "key": "profile.name",
                         "value": {
-                            "stringValue": "feature-bldr-retail-sh"
+                            "stringValue": "fdp-batch-debit-rule-audit"
                         }
                     },
                     {
                         "key": "region.deployed",
                         "value": {
-                            "stringValue": "US|UK &(AWS)"
+                            "stringValue": "UK"
                         }
                     },
                     {
                         "key": "image.details",
                         "value": {
-                            "stringValue": "rhel8.java8"
+                            "stringValue": "rhel8.java21"
                         }
                     }
                 ]
@@ -37,7 +43,7 @@
                                 {
                                     "key": "cicd.pipeline.ci_job_name",
                                     "value": {
-                                        "stringValue": "deploy"
+                                        "stringValue": "deploy_both_dc"
                                     }
                                 },
                                 {
@@ -47,27 +53,57 @@
                                     }
                                 },
                                 {
+                                    "key": "cicd.pipeline.ci_job_url",
+                                    "value": {
+                                        "stringValue": "https://app.gitlab.barcapint.com/barclays/fdp-shared-propagation/fdp-batch-generic/-/jobs/53008463"
+                                    }
+                                },
+                                {
+                                    "key": "cicd.pipeline.ci_pipeline_url",
+                                    "value": {
+                                        "stringValue": "https://app.gitlab.barcapint.com/barclays/fdp-shared-propagation/fdp-batch-generic/-/pipelines/7219609"
+                                    }
+                                },
+                                {
+                                    "key": "cicd.pipeline.ci_project_name",
+                                    "value": {
+                                        "stringValue": "fdp-batch-generic"
+                                    }
+                                },
+                                {
+                                    "key": "cicd.pipeline.ci_project_path_slug",
+                                    "value": {
+                                        "stringValue": "barclays-fdp-shared-propagation-fdp-batch-generic"
+                                    }
+                                },
+                                {
                                     "key": "cicd.pipeline.ci_project_path",
                                     "value": {
-                                        "stringValue": "barclays/fml-tf/feature-builder-retail"
+                                        "stringValue": "barclays/fdp-shared-propagation/fdp-batch-generic"
+                                    }
+                                },
+                                {
+                                    "key": "cicd.pipeline.ci_merge_request_target_branch_name",
+                                    "value": {
+                                        "stringValue": ""
                                     }
                                 },
                                 {
                                     "key": "app.image.version",
                                     "value": {
-                                        "stringValue": "feature-FRAUDPL-2206-2.1.0-397"
+                                        "stringValue": "feature-FRAUDPL-2391-1.0.0-2191"
                                     }
                                 },
                                 {
                                     "key": "base.image.version",
                                     "value": {
-                                        "stringValue": "1.23-3.1764066432"
+                                        "stringValue": "1.23-3.1767880120"
                                     }
                                 },
                                 {
                                     "key": "app.image.environment",
                                     "value": {
-                                        "stringValue": "prod"
+                                        "stringValue": "sit"
                                     }
                                 },
                                 {
@@ -83,6 +119,12 @@
                                     }
                                 },
                                 {
+                                    "key": "transaction_cycle",
+                                    "value": {
+                                        "stringValue": "tc-13"
+                                    }
+                                },
+                                {
                                     "key": "language",
                                     "value": {
                                         "stringValue": "java"
@@ -91,7 +133,7 @@
                                 {
                                     "key": "target_deployment",
                                     "value": {
-                                        "stringValue": "aws"
+                                        "stringValue": "bcp"
                                     }
                                 },
                                 {
@@ -99,172 +141,26 @@
                                     "value": {
                                         "stringValue": "apm0176758987"
                                     }
-                                }
-                            ],
-                            "endTimeUnixNano": "1767331987039851444",
-                            "name": "deploy",
-                            "spanId": "1961028472fecde3",
-                            "traceId": "c8b05580ccf94395b0aaad869d4a8107"
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "resource": {
-                "attributes": [
-                    {
-                        "key": "service.name",
-                        "value": {
-                            "stringValue": "transaction-monitor-service"
-                        }
-                    },
-                    {
-                        "key": "region.deployed",
-                        "value": {
-                            "stringValue": "US (AWS)"
-                        }
-                    },
-                    {
-                        "key": "image.details",
-                        "value": {
-                            "stringValue": "rhel8.java8"
-                        }
-                    }
-                ]
-            },
-            "scopeSpans": [
-                {
-                    "spans": [
-                        {
-                            "attributes": [
+                                },
                                 {
-                                    "key": "cicd.pipeline.ci_job_name",
+                                    "key": "target_compliance_quarter",
                                     "value": {
-                                        "stringValue": "deploy"
+                                        "stringValue": "q4"
                                     }
                                 },
                                 {
-                                    "key": "cicd.pipeline.ci_job_status",
+                                    "key": "target_compliance_year",
                                     "value": {
-                                        "stringValue": "success"
-                                    }
-                                },
-                                {
-                                    "key": "cicd.pipeline.ci_project_path",
-                                    "value": {
-                                        "stringValue": "barclays/fml-tf/transaction-monitor-service"
-                                    }
-                                },
-                                {
-                                    "key": "app.image.version",
-                                    "value": {
-                                        "stringValue": "release-1.5.0-123"
-                                    }
-                                },
-                                {
-                                    "key": "base.image.version",
-                                    "value": {
-                                        "stringValue": "8.10-1766090767"
-                                    }
-                                },
-                                {
-                                    "key": "app.image.environment",
-                                    "value": {
-                                        "stringValue": "prod"
-                                    }
-                                },
-                                {
-                                    "key": "target_deployment",
-                                    "value": {
-                                        "stringValue": "aws"
+                                        "stringValue": "2025"
                                     }
                                 }
                             ],
-                            "endTimeUnixNano": "1767332000000000000",
-                            "name": "deploy",
-                            "spanId": "2961028472fecde4",
-                            "traceId": "d8b05580ccf94395b0aaad869d4a8108"
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "resource": {
-                "attributes": [
-                    {
-                        "key": "service.name",
-                        "value": {
-                            "stringValue": "fraud-detection-engine"
-                        }
-                    },
-                    {
-                        "key": "region.deployed",
-                        "value": {
-                            "stringValue": "UK (AWS)"
-                        }
-                    },
-                    {
-                        "key": "image.details",
-                        "value": {
-                            "stringValue": "rhel8.java8"
-                        }
-                    }
-                ]
-            },
-            "scopeSpans": [
-                {
-                    "spans": [
-                        {
-                            "attributes": [
-                                {
-                                    "key": "cicd.pipeline.ci_job_name",
-                                    "value": {
-                                        "stringValue": "deploy"
-                                    }
-                                },
-                                {
-                                    "key": "cicd.pipeline.ci_job_status",
-                                    "value": {
-                                        "stringValue": "success"
-                                    }
-                                },
-                                {
-                                    "key": "cicd.pipeline.ci_project_path",
-                                    "value": {
-                                        "stringValue": "barclays/fml-tf/fraud-detection-engine"
-                                    }
-                                },
-                                {
-                                    "key": "app.image.version",
-                                    "value": {
-                                        "stringValue": "v2.3.0-456"
-                                    }
-                                },
-                                {
-                                    "key": "base.image.version",
-                                    "value": {
-                                        "stringValue": "8.9-1765000000"
-                                    }
-                                },
-                                {
-                                    "key": "app.image.environment",
-                                    "value": {
-                                        "stringValue": "prod"
-                                    }
-                                },
-                                {
-                                    "key": "target_deployment",
-                                    "value": {
-                                        "stringValue": "aws"
-                                    }
-                                }
-                            ],
-                            "endTimeUnixNano": "1767333000000000000",
-                            "name": "deploy",
-                            "spanId": "3961028472fecde5",
-                            "traceId": "e8b05580ccf94395b0aaad869d4a8109"
+                            "endTimeUnixNano": "1769074834084527381",
+                            "name": "deploy_both_dc",
+                            "parentSpanId": "59dfa0e14dbf3d26",
+                            "spanId": "e9c79405c4cfc48d",
+                            "startTimeUnixNano": "1769074219000000000",
+                            "traceId": "4406c0faa5e346f38fce5cf6c7f94c5d"
                         }
                     ]
                 }

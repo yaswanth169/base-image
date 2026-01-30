@@ -15,56 +15,55 @@ class ComplianceChecker:
     
     def __init__(self, config: ComplianceConfig):
         self.config = config
-        self.target_image_type = config.target_image_type
-        # Initialize real Red Hat client
         self.rh_client = RedHatClient(config.redhat_api_url)
-        self.latest_tag_cache = None
         
-    def _get_latest_tag(self) -> str:
-        """Get latest tag from API, fallback to config if fails."""
-        if self.latest_tag_cache:
-            return self.latest_tag_cache
-            
-        # Try fetching from API
-        # Extract 'rhel8' from 'rhel8.java8' for search
-        search_name = self.target_image_type.split('.')[0]
-        
-        rh_tag = self.rh_client.get_latest_tag(search_name)
-        if rh_tag:
-            logger.info(f"Retrieved latest tag from Red Hat API: {rh_tag.tag}")
-            self.latest_tag_cache = rh_tag.tag
-            return rh_tag.tag
-            
-        logger.warning(f"Failed to get tag from API, using fallback: {self.config.latest_base_image_tag}")
-        return self.config.latest_base_image_tag
-    
     def check_all(self, services: List[ServiceRecord]) -> List[ComplianceResult]:
-        # Refresh latest tag at start of check
-        self.latest_tag_cache = None
-        latest_tag = self._get_latest_tag()
-        
-        results = [self.check_service(s, latest_tag) for s in services]
-        compliant = sum(1 for r in results if r.is_compliant)
-        logger.info(f"Compliance: {compliant}/{len(results)} compliant (Target: {latest_tag})")
-        return results
+        return [self.check_service(s) for s in services]
     
-    def check_service(self, service: ServiceRecord, latest_tag: str) -> ComplianceResult:
+    def check_service(self, service: ServiceRecord) -> ComplianceResult:
+        """
+        Check compliance dynamically based on the service's own image type.
+        Uses the full image name (e.g., rhel8-java21) for API query.
+        """
         current_tag = service.base_image_version
+        image_type = service.image_type
         
-        # Use simple comparison first
+        if not image_type:
+            logger.warning(f"Service {service.service_name} has no image type defined. Skipping API check.")
+            return ComplianceResult(
+                service=service,
+                is_compliant=False,
+                current_tag=current_tag,
+                latest_tag="unknown",
+                status=ComplianceStatus.UNKNOWN,
+                remediation_required=False
+            )
+
+        search_name = image_type.replace('.', '-') if '.' in image_type else image_type
+        
+        logger.info(f"[{service.service_name}] Querying Red Hat API for: {search_name}")
+        
+        latest_tag_info = self.rh_client.get_latest_tag(search_name)
+        
+        if latest_tag_info:
+            latest_tag = latest_tag_info.tag
+            logger.info(f"[{service.service_name}] Latest tag for {search_name}: {latest_tag}")
+        else:
+            logger.warning(f"[{service.service_name}] Could not find tags for {search_name}. Using fallback.")
+            latest_tag = self.config.latest_base_image_tag
+
         is_within_threshold, tag_age = compare_versions(current_tag, latest_tag)
         
-        # If simple comparison fails, try using API for accurate age (N-n)
         if not is_within_threshold and tag_age == 1:
-             # Extract searchable name
-             search_name = self.target_image_type.split('.')[0]
-             real_age = self.rh_client.get_tag_age(search_name, current_tag)
-             if real_age is not None:
-                 tag_age = real_age
+            real_age = self.rh_client.get_tag_age(search_name, current_tag)
+            if real_age is not None:
+                tag_age = real_age
         
         is_compliant = is_within_threshold
         remediation_required = not is_within_threshold
         status = ComplianceStatus.COMPLIANT if is_compliant else ComplianceStatus.NON_COMPLIANT
+        
+        logger.info(f"[{service.service_name}] Current: {current_tag} | Latest: {latest_tag} | Compliant: {'YES' if is_compliant else 'NO'}")
         
         return ComplianceResult(
             service=service,

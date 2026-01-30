@@ -30,6 +30,7 @@ class RemediationStatus(str, Enum):
 @dataclass
 class ServiceRecord:
     service_name: str
+    profile_name: str
     project_path: str
     platform: str
     region: str
@@ -40,9 +41,15 @@ class ServiceRecord:
     metadata: Dict[str, Any] = field(default_factory=dict)
     deploy_timestamp: Optional[str] = None
     
+    @property
+    def deployment_name(self) -> str:
+        """Returns the deployment name for platform validation."""
+        return self.profile_name if self.profile_name else self.service_name
+    
     def to_dict(self) -> Dict[str, Any]:
         return {
             "service_name": self.service_name,
+            "profile_name": self.profile_name,
             "project_path": self.project_path,
             "platform": self.platform,
             "region": self.region,
@@ -68,9 +75,11 @@ class ComplianceResult:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "service_name": self.service.service_name,
+            "profile_name": self.service.profile_name,
             "project_path": self.service.project_path,
             "platform": self.service.platform,
             "environment": self.service.environment,
+            "image_type": self.service.image_type,
             "is_compliant": self.is_compliant,
             "current_tag": self.current_tag,
             "latest_tag": self.latest_tag,

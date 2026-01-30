@@ -1,6 +1,6 @@
 # Base Image Automation Agent
 
-Automates base image compliance checking and pipeline remediation for services deployed on AWS ECS and OpenShift.
+Automates base image compliance checking and pipeline remediation for services deployed on AWS ECS and OpenShift (APaaS/BCP).
 
 ## Project Structure
 
@@ -10,15 +10,15 @@ base-image/
 │   ├── __init__.py
 │   ├── base_image_agent.py          # Main orchestrator
 │   ├── common/
-│   │   ├── config.py                # Static config from .env
+│   │   ├── config.py                # Configuration loading
 │   │   ├── models.py                # Data models
 │   │   └── utils.py                 # Utilities
 │   ├── discovery/
-│   │   ├── otel_discovery.py        # Dynamic OTEL parsing
+│   │   ├── otel_discovery.py        # OTEL JSON parsing
 │   │   ├── aws_discovery.py         # AWS ECS discovery
 │   │   └── ose_discovery.py         # OpenShift discovery
 │   ├── compliance/
-│   │   ├── compliance_checker.py    # Step 2a & 2b
+│   │   ├── compliance_checker.py    # Compliance logic
 │   │   └── redhat_client.py         # Red Hat API client
 │   ├── remediation/
 │   │   ├── gitlab_client.py         # GitLab API
@@ -26,7 +26,7 @@ base-image/
 │   └── reporting/
 │       └── report_generator.py      # JSON/CSV reports
 ├── config/
-│   ├── .env.example                 # Static infrastructure config
+│   ├── .env.example                 # Configuration template
 │   └── sample_otel.json             # Sample input data
 ├── scripts/
 │   └── run_agent.py                 # CLI entry point
@@ -53,17 +53,43 @@ python scripts/run_agent.py --input config/sample_otel.json --trigger
 
 ## Configuration
 
-**config/.env** - Static infrastructure config only:
-- `GITLAB_URL`, `GITLAB_PRIVATE_TOKEN` - GitLab API
+**config/.env** - Configuration options:
+- `GITLAB_URL`, `GITLAB_PRIVATE_TOKEN` - GitLab API access
+- `OSE_PRIMARY_ENDPOINT`, `OSE_NAMESPACE` - OpenShift access
 - `AWS_PROXY_URL`, `AWS_PORTAL_URL` - AWS access
-- `OSE_PRIMARY_ENDPOINT` - OpenShift access
-- `LATEST_BASE_IMAGE_TAG` - Target compliance tag
+- `REDHAT_API_URL` - Red Hat Container Catalog
 - `DRY_RUN` - Set to `false` to trigger pipelines
 
 ## Workflow
 
-1. **Step 1**: Parse OTEL JSON → Flat table (dynamic field extraction)
-2. **Step 2a**: Platform validation
-3. **Step 2b**: Tag age check (N/N-n)
-4. **Step 3**: Trigger pipelines for non-compliant services
-5. Generate JSON/CSV reports
+1. **Parse**: Load OTEL JSON, extract service details
+2. **Validate Fields**: Ensure required fields (image.details, region.deployed) are present
+3. **Validate Platform**: Check service exists on OSE or AWS
+4. **Compliance Check**: Query Red Hat API, compare versions
+5. **Remediation**: Trigger GitLab pipelines for non-compliant services
+6. **Report**: Generate JSON/CSV reports
+
+## Required JSON Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `service.name` | Service identifier | `fdp-batch-generic` |
+| `profile.name` | Deployment name (OSE) | `fdp-batch-debit-rule-audit` |
+| `region.deployed` | Deployment region | `UK` |
+| `image.details` | Base image type | `rhel8.java21` |
+| `ci_project_path` | GitLab project path | `barclays/fdp-shared-propagation/fdp-batch-generic` |
+| `base.image.version` | Current base image version | `1.23-3.1767880120` |
+| `target_deployment` | Platform | `bcp` or `aws` |
+
+## Command Line Options
+
+```
+python scripts/run_agent.py --help
+
+Options:
+  --input, -i     Input OTEL JSON file (required)
+  --branch, -b    Git branch for pipeline (default: main)
+  --trigger, -t   Trigger pipelines (disable dry run)
+  --config, -c    Path to .env config file
+  --log-level, -l Log level (default: INFO)
+```

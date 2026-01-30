@@ -5,7 +5,7 @@ import os
 from typing import List, Optional, Dict, Any
 
 from src.common.models import ServiceRecord
-from src.common.config import OSEConfig
+from src.common.config import OSEConfig, APAAS_V4_ID, APAAS_V4_DC_PRIMARY, APAAS_V4_DC_SHADOW
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ class OSECredentialProvider:
     def __init__(self, config: OSEConfig):
         self.primary_endpoint = config.primary_endpoint
         self.shadow_endpoint = config.shadow_endpoint
+        self.namespace = config.namespace
     
     def get_client(self, endpoint: str, token: str = None, location: str = "primary"):
         if not HAS_OPENSHIFT:
@@ -31,8 +32,8 @@ class OSECredentialProvider:
         
         try:
             config = Configuration()
-            config.host = endpoint
-            config.verify_ssl = True
+            config.host = endpoint.rstrip('/')
+            config.verify_ssl = False
             
             if token:
                 config.api_key = {"authorization": f"Bearer {token}"}
@@ -86,24 +87,44 @@ class OSEDiscovery:
         
         return len(self._clients) > 0
     
-    def list_deployments(self, namespace: str, location: str = "primary") -> List[str]:
+    def connect_to_apaas(self, token: str = None) -> bool:
+        """Connect using hardcoded APaaS endpoints."""
+        try:
+            primary = self.credential_provider.get_client(APAAS_V4_DC_PRIMARY, token, "primary")
+            if primary:
+                self._clients["primary"] = primary
+                logger.info(f"Connected to APaaS primary: {APAAS_V4_DC_PRIMARY}")
+            
+            shadow = self.credential_provider.get_client(APAAS_V4_DC_SHADOW, token, "shadow")
+            if shadow:
+                self._clients["shadow"] = shadow
+                logger.info(f"Connected to APaaS shadow: {APAAS_V4_DC_SHADOW}")
+            
+            return len(self._clients) > 0
+        except Exception as e:
+            logger.error(f"Failed to connect to APaaS: {e}")
+            return False
+    
+    def list_deployments(self, namespace: str = None, location: str = "primary") -> List[str]:
         client = self._clients.get(location)
         if not client:
             return []
+        
+        ns = namespace or self.config.namespace or APAAS_V4_ID
         
         try:
             deployments = []
             
             try:
                 resource = client.resources.get(api_version='apps/v1', kind='Deployment')
-                result = resource.get(namespace=namespace)
+                result = resource.get(namespace=ns)
                 deployments.extend([d.metadata.name for d in result.items])
             except Exception:
                 pass
             
             try:
                 resource = client.resources.get(api_version='apps.openshift.io/v1', kind='DeploymentConfig')
-                result = resource.get(namespace=namespace)
+                result = resource.get(namespace=ns)
                 deployments.extend([d.metadata.name for d in result.items])
             except Exception:
                 pass
@@ -113,10 +134,14 @@ class OSEDiscovery:
             logger.error(f"Error listing deployments: {e}")
             return []
     
-    def get_deployment_details(self, name: str, namespace: str, location: str = "primary") -> Optional[ServiceRecord]:
+    def get_deployment_by_name(self, deployment_name: str, namespace: str = None, location: str = "primary") -> Optional[Dict]:
+        """Get deployment using explicit name and namespace."""
         client = self._clients.get(location)
         if not client:
+            logger.warning(f"No client available for location: {location}")
             return None
+        
+        ns = namespace or self.config.namespace or APAAS_V4_ID
         
         try:
             deployment = None
@@ -124,11 +149,49 @@ class OSEDiscovery:
             
             try:
                 resource = client.resources.get(api_version='apps/v1', kind='Deployment')
-                deployment = resource.get(name=name, namespace=namespace)
+                deployment = resource.get(name=deployment_name, namespace=ns)
+                logger.info(f"Found Deployment: {deployment_name} in namespace {ns}")
             except Exception:
                 try:
                     resource = client.resources.get(api_version='apps.openshift.io/v1', kind='DeploymentConfig')
-                    deployment = resource.get(name=name, namespace=namespace)
+                    deployment = resource.get(name=deployment_name, namespace=ns)
+                    kind = "DeploymentConfig"
+                    logger.info(f"Found DeploymentConfig: {deployment_name} in namespace {ns}")
+                except Exception:
+                    logger.warning(f"Deployment not found: {deployment_name} in namespace {ns}")
+                    return None
+            
+            if not deployment:
+                return None
+            
+            return {
+                "name": deployment_name,
+                "namespace": ns,
+                "kind": kind,
+                "exists": True
+            }
+        except Exception as e:
+            logger.error(f"Error getting deployment details: {e}")
+            return None
+    
+    def get_deployment_details(self, name: str, namespace: str = None, location: str = "primary") -> Optional[ServiceRecord]:
+        client = self._clients.get(location)
+        if not client:
+            return None
+        
+        ns = namespace or self.config.namespace or APAAS_V4_ID
+        
+        try:
+            deployment = None
+            kind = "Deployment"
+            
+            try:
+                resource = client.resources.get(api_version='apps/v1', kind='Deployment')
+                deployment = resource.get(name=name, namespace=ns)
+            except Exception:
+                try:
+                    resource = client.resources.get(api_version='apps.openshift.io/v1', kind='DeploymentConfig')
+                    deployment = resource.get(name=name, namespace=ns)
                     kind = "DeploymentConfig"
                 except Exception:
                     return None
@@ -153,6 +216,7 @@ class OSEDiscovery:
             
             return ServiceRecord(
                 service_name=name,
+                profile_name=name,
                 project_path=labels.get('GITLAB_PROJECT_PATH', env_vars.get('PROJECT_PATH', '')),
                 platform='ose',
                 region=location,
@@ -160,7 +224,7 @@ class OSEDiscovery:
                 app_image_version=labels.get('DEVOPS_APP_VERSION', ''),
                 base_image_version=labels.get('BASE_IMAGE_VERSION', ''),
                 environment=labels.get('ENVIRONMENT', env_vars.get('ENV', '')),
-                metadata={"namespace": namespace, "kind": kind},
+                metadata={"namespace": ns, "kind": kind},
             )
         except Exception as e:
             logger.error(f"Error getting deployment details: {e}")

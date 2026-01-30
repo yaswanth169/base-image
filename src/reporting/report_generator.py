@@ -45,7 +45,7 @@ class ReportGenerator:
         with open(filepath, 'w') as f:
             json.dump(report.to_dict(), f, indent=2, default=str)
         
-        logger.info(f"JSON report: {filepath}")
+        logger.info(f"JSON report saved: {filepath}")
         return filepath
     
     def save_csv(self, report: AgentReport, filename: str = None) -> str:
@@ -61,28 +61,41 @@ class ReportGenerator:
                 writer.writeheader()
                 writer.writerows(report.compliance_results)
         
-        logger.info(f"CSV report: {filepath}")
+        logger.info(f"CSV report saved: {filepath}")
         return filepath
     
     def print_summary(self, report: AgentReport):
         summary = report.to_dict()["summary"]
         
-        print("\n" + "=" * 50)
+        print("\n" + "=" * 60)
         print("BASE IMAGE AGENT REPORT")
-        print("=" * 50)
+        print("=" * 60)
         print(f"Timestamp: {report.run_timestamp}")
         print(f"Dry Run: {summary['dry_run']}")
-        print("-" * 50)
-        print(f"Total: {summary['total_services']}")
+        print("-" * 60)
+        print(f"Total Services: {summary['total_services']}")
         print(f"Compliant: {summary['compliant_count']} ({summary['compliance_rate']})")
         print(f"Non-compliant: {summary['non_compliant_count']}")
-        print("-" * 50)
+        print("-" * 60)
         print(f"Pipelines Triggered: {summary['pipelines_triggered']}")
         print(f"Pipelines Failed: {summary['pipelines_failed']}")
-        print("=" * 50)
+        print("=" * 60)
         
         if summary['non_compliant_count'] > 0:
-            print("\nNON-COMPLIANT:")
+            print("\nNON-COMPLIANT SERVICES:")
             for r in report.compliance_results:
                 if not r.get("is_compliant"):
-                    print(f"  - {r['service_name']}: {r['current_tag']} -> {r['latest_tag']}")
+                    service_name = r.get('service_name', 'unknown')
+                    profile_name = r.get('profile_name', '')
+                    current = r.get('current_tag', '')
+                    latest = r.get('latest_tag', '')
+                    tag_age = r.get('tag_age', '')
+                    
+                    display_name = f"{service_name}"
+                    if profile_name and profile_name != service_name:
+                        display_name = f"{service_name} ({profile_name})"
+                    
+                    print(f"  - {display_name}")
+                    print(f"    Current: {current} | Latest: {latest} | Age: {tag_age}")
+        
+        print("")

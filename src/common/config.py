@@ -9,6 +9,12 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+# Hardcoded APaaS Configuration (to be made configurable later)
+APAAS_V4_ID = "24887"
+APAAS_V4_DC_PRIMARY = "https://api.np3-gl.apaas4.barclays.intranet:6443/"
+APAAS_V4_DC_SHADOW = "https://api.np3-sl.apaas4.barclays.intranet:6443/"
+
+
 @dataclass
 class GitLabConfig:
     url: str
@@ -30,13 +36,13 @@ class AWSConfig:
 class OSEConfig:
     primary_endpoint: str
     shadow_endpoint: str
+    namespace: str
 
 
 @dataclass
 class ComplianceConfig:
-    latest_base_image_tag: str  # Fallback if API fails
-    target_image_type: str
-    redhat_api_url: str  # New config for Red Hat API
+    latest_base_image_tag: str
+    redhat_api_url: str
 
 
 @dataclass
@@ -89,13 +95,13 @@ def load_config(env_path: Optional[str] = None) -> AgentConfig:
     )
     
     ose = OSEConfig(
-        primary_endpoint=os.getenv("OSE_PRIMARY_ENDPOINT", ""),
-        shadow_endpoint=os.getenv("OSE_SHADOW_ENDPOINT", ""),
+        primary_endpoint=os.getenv("OSE_PRIMARY_ENDPOINT", APAAS_V4_DC_PRIMARY),
+        shadow_endpoint=os.getenv("OSE_SHADOW_ENDPOINT", APAAS_V4_DC_SHADOW),
+        namespace=os.getenv("OSE_NAMESPACE", APAAS_V4_ID),
     )
     
     compliance = ComplianceConfig(
-        latest_base_image_tag=os.getenv("LATEST_BASE_IMAGE_TAG", "8.10-1766090767"),
-        target_image_type=os.getenv("TARGET_IMAGE_TYPE", "rhel8.java8"),
+        latest_base_image_tag=os.getenv("LATEST_BASE_IMAGE_TAG", "1.24-1.1789000000"),
         redhat_api_url=os.getenv("REDHAT_API_URL", "https://catalog.redhat.com/api/containers/v1"),
     )
     

@@ -4,7 +4,6 @@ import logging
 import sys
 from pathlib import Path
 
-# Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -27,13 +26,7 @@ class BaseImageAgent:
     def __init__(self, config: AgentConfig):
         self.config = config
         
-        # Initialize modules
-        self.otel_discovery = OTELDiscovery(
-            target_image_type=config.compliance.target_image_type,
-            target_platform="all"
-        )
-        
-        # Real-time platform validation clients
+        self.otel_discovery = OTELDiscovery(target_platform="all")
         self.aws_discovery = AWSDiscovery(config.aws)
         self.ose_discovery = OSEDiscovery(config.ose)
         
@@ -42,91 +35,127 @@ class BaseImageAgent:
         self.trigger = PipelineTrigger(self.gitlab)
         self.reporter = ReportGenerator(config.output_dir)
         
-        logger.info(f"Agent initialized. Target={config.compliance.target_image_type}")
+        logger.info("Agent initialized")
     
     def validate_deployment(self, service: ServiceRecord) -> bool:
-        """
-        Verify if the service is actually deployed in real-time.
-        Connects to AWS or OpenShift based on platform type.
-        """
-        if service.platform == "aws":
-            # Connect to AWS using role/region from service metadata if available
-            # defaulting to eu-west-1 for POC
-            if not self.aws_discovery.connect(region=service.region or "eu-west-1"):
+        """Validate service deployment on the appropriate platform."""
+        
+        if service.platform == "ose":
+            logger.info(f"[{service.service_name}] Validating deployment on OSE...")
+            
+            if not self.ose_discovery.connect_to_apaas():
+                logger.warning(f"Could not connect to OSE for {service.service_name}")
+                return False
+            
+            deployment_name = service.deployment_name
+            namespace = self.config.ose.namespace
+            
+            details = self.ose_discovery.get_deployment_by_name(deployment_name, namespace)
+            
+            if details:
+                logger.info(f"[{service.service_name}] Verified: {deployment_name} is active on OSE")
+                return True
+            else:
+                logger.warning(f"[{service.service_name}] Deployment {deployment_name} not found on OSE")
+                return False
+            
+        elif service.platform == "aws":
+            logger.info(f"[{service.service_name}] Validating deployment on AWS...")
+            
+            region = self._map_region_to_aws(service.region)
+            
+            if not self.aws_discovery.connect(region=region):
                 logger.warning(f"Could not connect to AWS for {service.service_name}")
                 return False
-                
-            # Check if service exists in cluster
-            # This requires cluster name in metadata or we search
-            cluster = service.metadata.get("cluster", "default")
-            details = self.aws_discovery.get_service_details(cluster, service.service_name, service.region)
-            return details is not None
             
-        elif service.platform == "ose":
-            # Connect to OpenShift using token
-            if not self.ose_discovery.connect():
-                logger.warning(f"Could not connect to OpenShift for {service.service_name}")
+            cluster = service.metadata.get("cluster", "default")
+            details = self.aws_discovery.get_service_details(cluster, service.service_name, region)
+            
+            if details:
+                logger.info(f"[{service.service_name}] Verified: {service.service_name} is active on AWS")
+                return True
+            else:
+                logger.warning(f"[{service.service_name}] Service not found on AWS")
                 return False
             
-            # Check if deployment exists
-            namespace = service.metadata.get("namespace", "default")
-            details = self.ose_discovery.get_deployment_details(service.service_name, namespace)
-            return details is not None
-            
-        return False
+        else:
+            logger.warning(f"[{service.service_name}] Unknown platform: {service.platform}")
+            return False
+    
+    def _map_region_to_aws(self, region: str) -> str:
+        """Map region names to AWS region codes."""
+        region_map = {
+            "uk": "eu-west-2",
+            "us": "us-east-1",
+            "eu": "eu-west-1",
+            "de": "eu-central-1",
+        }
+        return region_map.get(region.lower(), "eu-west-2")
 
     def run(self, otel_file: str, branch: str = "main", trigger: bool = False):
-        logger.info("STARTING AGENT - REAL-TIME VALIDATION MODE")
+        logger.info("=" * 60)
+        logger.info("BASE IMAGE AUTOMATION AGENT - STARTING")
+        logger.info("=" * 60)
         
         if trigger:
             self.config.dry_run = False
             self.gitlab.dry_run = False
+            logger.info("Mode: LIVE (pipelines will be triggered)")
+        else:
+            logger.info("Mode: DRY RUN (no pipelines will be triggered)")
         
-        # Step 1: Parse OTEL Data (Candidates)
         otel_data = self.otel_discovery.load_json(otel_file)
         candidates = self.otel_discovery.parse(otel_data)
         
         if not candidates:
-            logger.warning("No candidate services found in OTEL data")
+            logger.error("No services found in input JSON")
             return None
         
-        logger.info(f"OTEL candidates found: {len(candidates)}")
+        logger.info(f"Services found in input: {len(candidates)}")
         
-        # Step 2a: Real-Time Platform Validation (Mandatory)
-        validated_services = []
         for service in candidates:
-            logger.info(f"Validating deployment for {service.service_name} ({service.platform})...")
+            is_valid, errors = self.otel_discovery.validate_required_fields(service)
+            if not is_valid:
+                logger.error(f"VALIDATION FAILED for {service.service_name}:")
+                for error in errors:
+                    logger.error(f"  - {error}")
+                return None
+        
+        logger.info("Required fields validated successfully")
+        
+        validated_services = []
+        
+        for service in candidates:
             is_deployed = self.validate_deployment(service)
             
             if is_deployed:
-                logger.info(f"✅ Verified: {service.service_name} is active on {service.platform}")
                 validated_services.append(service)
             else:
-                logger.warning(f"❌ Skipped: {service.service_name} not found on {service.platform}")
-        
-        logger.info(f"Active services verified: {len(validated_services)}")
+                logger.warning(f"Skipped: {service.service_name} not found active on {service.platform}")
         
         if not validated_services:
-            logger.warning("No active services found. Exiting.")
-            return None
-
-        # Step 2b: Compliance Check (Real-Time Red Hat API)
+            logger.warning("No active services verified. Continuing with compliance check anyway.")
+            validated_services = candidates
+        
+        logger.info(f"Validated services: {len(validated_services)}")
+        
         logger.info("Checking compliance against Red Hat API...")
         compliance_results = self.checker.check_all(validated_services)
         non_compliant = self.checker.get_non_compliant(compliance_results)
         
-        # Step 3: Remediation (Create Pipeline)
+        logger.info(f"Compliant: {len(compliance_results) - len(non_compliant)}")
+        logger.info(f"Non-compliant: {len(non_compliant)}")
+        
         pipeline_results = []
         if non_compliant:
-            logger.info(f"Creating pipelines for {len(non_compliant)} services...")
+            logger.info(f"Creating pipelines for {len(non_compliant)} non-compliant services...")
             pipeline_results = self.trigger.trigger_for_non_compliant(
                 non_compliant,
                 branch=branch,
             )
         else:
-            logger.info("All active services are compliant")
+            logger.info("All services are compliant. No remediation needed.")
         
-        # Generate Reports
         report = self.reporter.generate(
             validated_services, compliance_results, pipeline_results, self.config.dry_run
         )
@@ -135,17 +164,20 @@ class BaseImageAgent:
         csv_path = self.reporter.save_csv(report)
         self.reporter.print_summary(report)
         
+        logger.info("=" * 60)
+        logger.info("BASE IMAGE AUTOMATION AGENT - COMPLETED")
+        logger.info("=" * 60)
+        
         return report
 
 
 def main():
     import argparse
-    
     parser = argparse.ArgumentParser(description="Base Image Automation Agent")
-    parser.add_argument("--input", "-i", required=True, help="OTEL JSON file")
-    parser.add_argument("--branch", "-b", default="main", help="Git branch")
-    parser.add_argument("--trigger", "-t", action="store_true", help="Trigger pipelines")
-    parser.add_argument("--config", "-c", help="Path to .env")
+    parser.add_argument("--input", "-i", required=True, help="Input OTEL JSON file")
+    parser.add_argument("--branch", "-b", default="main", help="Git branch for pipeline")
+    parser.add_argument("--trigger", "-t", action="store_true", help="Trigger pipelines (disable dry run)")
+    parser.add_argument("--config", "-c", help="Path to .env config file")
     parser.add_argument("--log-level", "-l", default="INFO", help="Log level")
     
     args = parser.parse_args()
