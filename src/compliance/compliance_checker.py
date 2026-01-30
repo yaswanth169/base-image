@@ -49,8 +49,15 @@ class ComplianceChecker:
             latest_tag = latest_tag_info.tag
             logger.info(f"[{service.service_name}] Latest tag for {search_name}: {latest_tag}")
         else:
-            logger.warning(f"[{service.service_name}] Could not find tags for {search_name}. Using fallback.")
-            latest_tag = self.config.latest_base_image_tag
+            logger.error(f"[{service.service_name}] FAILED to fetch latest tag for {search_name} from Red Hat API. Skipping compliance check.")
+            return ComplianceResult(
+                service=service,
+                is_compliant=False,
+                current_tag=current_tag,
+                latest_tag="API_FETCH_FAILED",
+                status=ComplianceStatus.UNKNOWN,
+                remediation_required=False
+            )
 
         is_within_threshold, tag_age = compare_versions(current_tag, latest_tag)
         

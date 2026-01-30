@@ -69,7 +69,6 @@ AWS_PORTAL_URL=https://awsportal.barcapint.com/v1/creds-provider/provide-credent
 
 # Red Hat API Configuration
 REDHAT_API_URL=https://catalog.redhat.com/api/containers/v1
-LATEST_BASE_IMAGE_TAG=1.24-1.1789000000
 
 # Agent Settings
 DRY_RUN=true

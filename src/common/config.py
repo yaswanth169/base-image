@@ -41,7 +41,6 @@ class OSEConfig:
 
 @dataclass
 class ComplianceConfig:
-    latest_base_image_tag: str
     redhat_api_url: str
 
 
@@ -101,7 +100,6 @@ def load_config(env_path: Optional[str] = None) -> AgentConfig:
     )
     
     compliance = ComplianceConfig(
-        latest_base_image_tag=os.getenv("LATEST_BASE_IMAGE_TAG", "1.24-1.1789000000"),
         redhat_api_url=os.getenv("REDHAT_API_URL", "https://catalog.redhat.com/api/containers/v1"),
     )
     
