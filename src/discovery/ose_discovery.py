@@ -1,7 +1,6 @@
 """OpenShift/OSE discovery module."""
 
 import logging
-import os
 from typing import List, Optional, Dict, Any
 
 from src.common.models import ServiceRecord
@@ -11,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 try:
     from kubernetes import client as k8s_client
-    from kubernetes.client import Configuration
     from openshift.dynamic import DynamicClient
+    from openshift.helper.userpassauth import OCPLoginConfiguration
     HAS_OPENSHIFT = True
 except ImportError:
     HAS_OPENSHIFT = False
@@ -24,46 +23,41 @@ class OSECredentialProvider:
         self.primary_endpoint = config.primary_endpoint
         self.shadow_endpoint = config.shadow_endpoint
         self.namespace = config.namespace
+        self.username = config.username
+        self.password = config.password
     
-    def get_client(self, endpoint: str, token: str = None, location: str = "primary"):
+    def get_client(self, endpoint: str, location: str = "primary"):
         if not HAS_OPENSHIFT:
             logger.error("openshift library not installed")
             return None
         
+        if not self.username or not self.password:
+            logger.error("OSE_USERNAME and OSE_PASSWORD are required for OpenShift authentication")
+            return None
+        
         try:
-            config = Configuration()
-            config.host = endpoint.rstrip('/')
-            config.verify_ssl = False
+            logger.info(f"Creating client for {endpoint} using {self.username}")
+            kubeConfig = OCPLoginConfiguration(
+                ocp_username=self.username,
+                ocp_password=self.password
+            )
+            kubeConfig.host = endpoint.rstrip('/')
+            kubeConfig.verify_ssl = False
+            kubeConfig.get_token()
             
-            if token:
-                config.api_key = {"authorization": f"Bearer {token}"}
-            else:
-                token = self._get_token_from_env()
-                if token:
-                    config.api_key = {"authorization": f"Bearer {token}"}
-            
-            api_client = k8s_client.ApiClient(config)
-            return DynamicClient(api_client)
+            api_client = k8s_client.ApiClient(kubeConfig)
+            dyn_client = DynamicClient(api_client)
+            logger.info(f"Created client for {location}")
+            return dyn_client
         except Exception as e:
             logger.exception(f"Error creating OSE client: {e}")
             return None
     
-    def get_primary_client(self, token: str = None):
-        return self.get_client(self.primary_endpoint, token, "primary")
+    def get_primary_client(self):
+        return self.get_client(self.primary_endpoint, "primary")
     
-    def get_shadow_client(self, token: str = None):
-        return self.get_client(self.shadow_endpoint, token, "shadow")
-    
-    def _get_token_from_env(self) -> Optional[str]:
-        token = os.getenv("OSE_TOKEN") or os.getenv("OPENSHIFT_TOKEN")
-        if token:
-            return token
-        
-        token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-        if os.path.exists(token_path):
-            with open(token_path, 'r') as f:
-                return f.read().strip()
-        return None
+    def get_shadow_client(self):
+        return self.get_client(self.shadow_endpoint, "shadow")
 
 
 class OSEDiscovery:
@@ -76,26 +70,26 @@ class OSEDiscovery:
     def set_client(self, location: str, client):
         self._clients[location] = client
     
-    def connect(self, token: str = None) -> bool:
-        primary = self.credential_provider.get_primary_client(token)
+    def connect(self) -> bool:
+        primary = self.credential_provider.get_primary_client()
         if primary:
             self._clients["primary"] = primary
         
-        shadow = self.credential_provider.get_shadow_client(token)
+        shadow = self.credential_provider.get_shadow_client()
         if shadow:
             self._clients["shadow"] = shadow
         
         return len(self._clients) > 0
     
-    def connect_to_apaas(self, token: str = None) -> bool:
+    def connect_to_apaas(self) -> bool:
         """Connect using hardcoded APaaS endpoints."""
         try:
-            primary = self.credential_provider.get_client(APAAS_V4_DC_PRIMARY, token, "primary")
+            primary = self.credential_provider.get_client(APAAS_V4_DC_PRIMARY, "primary")
             if primary:
                 self._clients["primary"] = primary
                 logger.info(f"Connected to APaaS primary: {APAAS_V4_DC_PRIMARY}")
             
-            shadow = self.credential_provider.get_client(APAAS_V4_DC_SHADOW, token, "shadow")
+            shadow = self.credential_provider.get_client(APAAS_V4_DC_SHADOW, "shadow")
             if shadow:
                 self._clients["shadow"] = shadow
                 logger.info(f"Connected to APaaS shadow: {APAAS_V4_DC_SHADOW}")

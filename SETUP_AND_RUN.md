@@ -62,6 +62,8 @@ GITLAB_API_VERSION=v4
 OSE_PRIMARY_ENDPOINT=https://api.np3-gl.apaas4.barclays.intranet:6443/
 OSE_SHADOW_ENDPOINT=https://api.np3-sl.apaas4.barclays.intranet:6443/
 OSE_NAMESPACE=24887
+OSE_USERNAME=your-username-here
+OSE_PASSWORD=your-password-here
 
 # AWS Configuration (if validating AWS deployments)
 AWS_PROXY_URL=http://primary-proxy.gslb.intranet.barcapint.com:8080
@@ -84,6 +86,8 @@ OUTPUT_DIR=./output
 |----------|----------|-------------|---------|
 | `GITLAB_PRIVATE_TOKEN` | **YES** | GitLab API token for pipeline triggers | - |
 | `GITLAB_URL` | No | GitLab server URL | `https://app.gitlab.barcapint.com` |
+| `OSE_USERNAME` | **YES** (for OSE) | OpenShift username for authentication | - |
+| `OSE_PASSWORD` | **YES** (for OSE) | OpenShift password for authentication | - |
 | `OSE_PRIMARY_ENDPOINT` | No | APaaS primary cluster URL | Hardcoded |
 | `OSE_NAMESPACE` | No | OpenShift namespace/project ID | `24887` |
 | `REDHAT_API_URL` | No | Red Hat Container Catalog API | `https://catalog.redhat.com/api/containers/v1` |

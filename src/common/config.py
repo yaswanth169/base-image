@@ -37,6 +37,8 @@ class OSEConfig:
     primary_endpoint: str
     shadow_endpoint: str
     namespace: str
+    username: str
+    password: str
 
 
 @dataclass
@@ -97,6 +99,8 @@ def load_config(env_path: Optional[str] = None) -> AgentConfig:
         primary_endpoint=os.getenv("OSE_PRIMARY_ENDPOINT", APAAS_V4_DC_PRIMARY),
         shadow_endpoint=os.getenv("OSE_SHADOW_ENDPOINT", APAAS_V4_DC_SHADOW),
         namespace=os.getenv("OSE_NAMESPACE", APAAS_V4_ID),
+        username=os.getenv("OSE_USERNAME", ""),
+        password=os.getenv("OSE_PASSWORD", ""),
     )
     
     compliance = ComplianceConfig(
