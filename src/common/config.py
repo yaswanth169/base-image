@@ -104,7 +104,7 @@ def load_config(env_path: Optional[str] = None) -> AgentConfig:
     )
     
     compliance = ComplianceConfig(
-        redhat_api_url=os.getenv("REDHAT_API_URL", "https://catalog.redhat.com/api/containers/v1"),
+        redhat_api_url=os.getenv("REDHAT_API_URL", "https://auto-changelog.apps.np3.apaas4.barclays.intranet"),
     )
     
     return AgentConfig(

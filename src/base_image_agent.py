@@ -41,7 +41,7 @@ class BaseImageAgent:
         """Validate service deployment on the appropriate platform."""
         
         if service.platform == "ose":
-            logger.info(f"[{service.service_name}] Validating deployment on OSE...")
+            logger.info(f"[{service.service_name}] Validating deployment on OSE (Strict Version Check)...")
             
             if not self.ose_discovery.connect_to_apaas():
                 logger.warning(f"Could not connect to OSE for {service.service_name}")
@@ -49,14 +49,23 @@ class BaseImageAgent:
             
             deployment_name = service.deployment_name
             namespace = self.config.ose.namespace
+            expected_version = service.app_image_version
             
-            details = self.ose_discovery.get_deployment_by_name(deployment_name, namespace)
+            # 1. Check Primary
+            primary_version = self.ose_discovery.get_deployment_version(deployment_name, namespace, "primary")
             
-            if details:
-                logger.info(f"[{service.service_name}] Verified: {deployment_name} is active on OSE")
+            # 2. Check Shadow
+            shadow_version = self.ose_discovery.get_deployment_version(deployment_name, namespace, "shadow")
+            
+            # 3. Strict Validation
+            if primary_version == expected_version and shadow_version == expected_version:
+                logger.info(f"[{service.service_name}] ✅ Verified: Version {expected_version} deployed in BOTH Primary and Shadow.")
                 return True
             else:
-                logger.warning(f"[{service.service_name}] Deployment {deployment_name} not found on OSE")
+                logger.error(f"[{service.service_name}] ❌ Version Validation FAILED")
+                logger.error(f"   Expected (OTEL): {expected_version}")
+                logger.error(f"   Primary DC:      {primary_version} [{'MATCH' if primary_version == expected_version else 'MISMATCH'}]")
+                logger.error(f"   Shadow DC:       {shadow_version}  [{'MATCH' if shadow_version == expected_version else 'MISMATCH'}]")
                 return False
             
         elif service.platform == "aws":

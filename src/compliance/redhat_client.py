@@ -26,6 +26,11 @@ class RedHatClient:
     def __init__(self, api_url: str):
         self.api_url = api_url.rstrip('/')
         self._image_cache: Dict[str, List[TagInfo]] = {}
+        self.rhel_image_names: dict = {
+            "rhel8-java21": "apaas/barclays-rhel8-rh-java-openjdk21-runtime",
+            "rhel8-java17": "apaas/barclays-rhel8-rh-java-openjdk17-runtime",
+            "rhel8-java8": "barclays/ubi8"
+        }
     
     def get_latest_tag(self, image_name: str) -> Optional[TagInfo]:
         """
@@ -70,14 +75,15 @@ class RedHatClient:
         
         try:
             # Step 1: Get Image ID
-            image_id = self._get_image_id(image_name)
+            base_image_name = self.rhel_image_names[image_name]
+            image_id = self._get_image_id(base_image_name)
             if not image_id:
-                logger.warning(f"Image not found: {image_name}")
+                logger.warning(f"Image not found: {base_image_name}")
                 return []
             
             # Step 2: Get Versions
             url = f"{self.api_url}/images/{image_id}/versions"
-            logger.info(f"Fetching versions for {image_name} (ID: {image_id}) from {url}")
+            logger.info(f"Fetching versions for {base_image_name} (ID: {image_id}) from {url}")
             
             response = requests.get(url, timeout=10)
             response.raise_for_status()

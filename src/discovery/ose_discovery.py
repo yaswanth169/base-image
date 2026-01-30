@@ -2,6 +2,7 @@
 
 import logging
 from typing import List, Optional, Dict, Any
+import urllib3
 
 from src.common.models import ServiceRecord
 from src.common.config import OSEConfig, APAAS_V4_ID, APAAS_V4_DC_PRIMARY, APAAS_V4_DC_SHADOW
@@ -25,6 +26,7 @@ class OSECredentialProvider:
         self.namespace = config.namespace
         self.username = config.username
         self.password = config.password
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning) # disbaled the warning for request.
     
     def get_client(self, endpoint: str, location: str = "primary"):
         if not HAS_OPENSHIFT:
@@ -222,6 +224,24 @@ class OSEDiscovery:
             )
         except Exception as e:
             logger.error(f"Error getting deployment details: {e}")
+            return None
+    
+    def get_deployment_version(self, service_name: str, namespace: str, location: str) -> Optional[str]:
+        client = self._clients.get(location)
+        if not client:
+            return None
+        
+        try:
+            try:
+                dc_resource = client.resources.get(api_version='apps.openshift.io/v1', kind='DeploymentConfig')
+                obj = dc_resource.get(name=service_name, namespace=namespace)
+                return obj.metadata.labels.get('DEVOPS_APP_VERSION')
+            except Exception:
+                deploy_resource = client.resources.get(api_version='apps/v1', kind='Deployment')
+                obj = deploy_resource.get(name=service_name, namespace=namespace)
+                return obj.metadata.labels.get('DEVOPS_APP_VERSION')
+        except Exception as e:
+            logger.error(f"Error fetching version for {service_name} in {location}: {e}")
             return None
     
     def _extract_image_type(self, image: str) -> str:
